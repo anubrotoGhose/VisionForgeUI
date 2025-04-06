@@ -283,7 +283,7 @@ const NeuralNetworkBuilder = ({
 
             <div className="mt-4 flex justify-center">
                 <button onClick={handleBuildModel} className="bg-indigo-500 px-4 py-2 rounded text-white">
-                    Train Model
+                    Build Model
                 </button>
             </div>
         </section>
