@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { FaRedoAlt, FaPlay, FaForward } from "react-icons/fa";
+import { useState, useRef } from "react";
+import { FaRedoAlt, FaPlay, FaPause, FaForward } from "react-icons/fa";
 import type { NextPage } from "next";
 import NeuralNetworkBuilder from "@/components/NeuralNetworkBuilder";
 
@@ -12,6 +12,10 @@ const Home: NextPage = () => {
   const [regularisation, setRegularisation] = useState<string>("None");
   const [regularisationRate, setRegularisationRate] = useState<number>(0);
   const [problemType, setProblemType] = useState<string>("Classification-Single");
+
+  // play pause button state
+  const [isPlaying, setIsPlaying] = useState(false);
+  const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
 
   // left panel
   const [useTrainingAsTesting, setUseTrainingAsTesting] = useState(true);
@@ -34,17 +38,38 @@ const Home: NextPage = () => {
 
 
   const handlePlay = () => {
-    setCurrentStage(0);
-    for (let i = 1; i <= epoch; i++) {
-      setTimeout(() => {
+    if (isPlaying) {
+      // Pause the loop
+      timeoutRefs.current.forEach(clearTimeout);
+      timeoutRefs.current = [];
+      setIsPlaying(false);
+      return;
+    }
+
+    // Play from current stage to epoch
+    setIsPlaying(true);
+
+    for (let i = currentStage + 1; i <= epoch; i++) {
+      const timeout = setTimeout(() => {
         setCurrentStage(i);
-      }, i * 50); // Slow down the loop for UI feedback
+
+        if (i === epoch) {
+          setIsPlaying(false); // Stop at the end
+        }
+      }, (i - currentStage) * 50);
+
+      timeoutRefs.current.push(timeout);
     }
   };
 
+
   const handleReset = () => {
+    timeoutRefs.current.forEach(clearTimeout); // stop any running loop
+    timeoutRefs.current = [];
     setCurrentStage(0);
+    setIsPlaying(false);
   };
+
 
   const handleSkip = () => {
     setCurrentStage((prev) => Math.min(prev + 1, epoch));
@@ -144,7 +169,7 @@ const Home: NextPage = () => {
   return (
     <div className="min-h-screen flex flex-col dark bg-gray-900 text-white">
       <div className="bg-gray-900 text-white px-6 py-2 text-lg font-semibold shadow-md">
-        NetMaker
+        VisionForge
       </div>
       {/* Top Bar with Controls */}
       <header className="bg-gray-800 p-4 shadow-md">
@@ -154,10 +179,11 @@ const Home: NextPage = () => {
           <div className="flex gap-2">
             <button
               onClick={handlePlay}
-              className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded flex items-center gap-1"
+              className={`${isPlaying ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"
+                } px-4 py-2 rounded flex items-center gap-1`}
             >
-              <FaPlay />
-              Play
+              {isPlaying ? <FaPause /> : <FaPlay />}
+              {isPlaying ? "Pause" : "Play"}
             </button>
             <button
               onClick={handleReset}
@@ -360,7 +386,7 @@ const Home: NextPage = () => {
                     setfeatureVectorNames([
                       ...columnTrainingNames.filter((col) => !selectedTargets.includes(col))
                     ]);
-                    
+
                   }
                 }}
               >
@@ -384,7 +410,8 @@ const Home: NextPage = () => {
           {featureVectorNames.length > 0 ? (
             <NeuralNetworkBuilder
               columnNames={featureVectorNames}
-              numOutputNeurons={numOutputNeurons ?? 2} // fallback to 2 if not loaded
+              numOutputNeurons={numOutputNeurons ?? 2}
+              problemType={problemType} // fallback to 2 if not loaded
             />
           ) : (
             <p className="text-gray-300">Upload training data to start building the network.</p>
