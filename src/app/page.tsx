@@ -11,7 +11,7 @@ const Home: NextPage = () => {
   const [activation, setActivation] = useState<string>("Tanh");
   const [regularisation, setRegularisation] = useState<string>("None");
   const [regularisationRate, setRegularisationRate] = useState<number>(0);
-  const [problemType, setProblemType] = useState<string>("Classification");
+  const [problemType, setProblemType] = useState<string>("Classification-Single");
 
   // left panel
   const [useTrainingAsTesting, setUseTrainingAsTesting] = useState(true);
@@ -19,7 +19,19 @@ const Home: NextPage = () => {
   const [batchSize, setBatchSize] = useState(10);
 
   // for maintaining list of features
-  const [columnNames, setColumnNames] = useState<string[]>([]);
+  const [columnTrainingNames, setcolumnTrainingNames] = useState<string[]>([]);
+
+  const [columnTestingNames, setcolumnTestingNames] = useState<string[]>([]);
+
+  const [featureVectorNames, setfeatureVectorNames] = useState<string[]>([]);
+
+  // for output neurons
+  const [numOutputNeurons, setNumOutputNeurons] = useState<number | null>(null);
+
+
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
+
 
   const handlePlay = () => {
     setCurrentStage(0);
@@ -38,12 +50,40 @@ const Home: NextPage = () => {
     setCurrentStage((prev) => Math.min(prev + 1, epoch));
   };
 
+  const handleGetTrainingTargetVectors = async (
+    file: File,
+    targetColumns: string,
+    taskType: string
+  ): Promise<void> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("target_columns", targetColumns); // comma-separated
+    formData.append("task_type", taskType);
+
+    try {
+      const response = await fetch("http://localhost:8000/get-target-vectors", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (response.ok) {
+        setNumOutputNeurons(result.num_output_neurons);
+
+      } else {
+        console.error("Error from API:", result.error);
+      }
+    } catch (err) {
+      console.error("Failed to fetch target vectors:", err);
+    }
+  };
+
   //left panel
   const handleTrainingDataUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const formData = new FormData();
-      formData.append("file", file); // "file" must match FastAPI parameter name
+      formData.append("file", file);
 
       try {
         const response = await fetch("http://localhost:8000/upload-training-data", {
@@ -53,10 +93,37 @@ const Home: NextPage = () => {
 
         if (response.ok) {
           const result = await response.json();
+          setcolumnTrainingNames(result.column_names);
+          setUploadedFile(file); // save file for later
+        } else {
+          console.error("Upload failed:", response.statusText);
+        }
+      } catch (err) {
+        console.error("Error uploading file:", err);
+      }
+    }
+  };
+
+
+
+  const handleTestingDataUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const formData = new FormData();
+      formData.append("file", file); // "file" must match FastAPI parameter name
+
+      try {
+        const response = await fetch("http://localhost:8000/upload-testing-data", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (response.ok) {
+          const result = await response.json();
           console.log("File uploaded successfully:", result);
 
           console.log("Column Names:", result.column_names);
-          setColumnNames(result.column_names);
+          setcolumnTestingNames(result.column_names);
 
         } else {
           console.error("Upload failed:", response.statusText);
@@ -68,13 +135,11 @@ const Home: NextPage = () => {
   };
 
 
-  const handleTestingDataUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Handle testing file logic
-      console.log(file.name)
-    }
-  };
+  const columnsMatch =
+    columnTrainingNames.length > 0 &&
+    columnTestingNames.length > 0 &&
+    columnTrainingNames.length === columnTestingNames.length &&
+    columnTrainingNames.every((name, idx) => name === columnTestingNames[idx]);
 
   return (
     <div className="min-h-screen flex flex-col dark bg-gray-900 text-white">
@@ -186,7 +251,8 @@ const Home: NextPage = () => {
               onChange={(e) => setProblemType(e.target.value)}
               className="bg-gray-700 px-3 py-1 rounded"
             >
-              <option>Classification</option>
+              <option>Classification-Single</option>
+              <option>Classification-Multilabel</option>
               <option>Regression</option>
             </select>
           </div>
@@ -233,31 +299,78 @@ const Home: NextPage = () => {
             <label className="text-sm">Use training data as testing data</label>
           </div>
 
-          {/* Ratio Slider */}
-          <div className={`mb-4 ${useTrainingAsTesting ? '' : 'opacity-50 pointer-events-none'}`}>
-            <label className="block text-sm mb-1">Train/Test Ratio: {trainTestRatio}</label>
-            <input
-              type="range"
-              min={0.1}
-              max={0.9}
-              step={0.05}
-              value={trainTestRatio}
-              onChange={(e) => setTrainTestRatio(parseFloat(e.target.value))}
-              className="w-full"
-            />
-          </div>
+          {/* 🆕 Target Column Selector */}
+          {uploadedFile && columnTrainingNames.length > 0 && (
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-white mb-2">
+                Select target {problemType === "classification-single" ? "column" : "columns"}:
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {columnTrainingNames.map((col) => (
+                  <label key={col} className="flex items-center gap-1 text-sm text-white">
+                    <input
+                      type={problemType === "classification-single" ? "radio" : "checkbox"}
+                      name="targetColumn"
+                      value={col}
+                      checked={selectedTargets.includes(col)}
+                      onChange={(e) => {
+                        if (problemType === "classification-single") {
+                          setSelectedTargets([col]);
+                        } else {
+                          setSelectedTargets((prev) =>
+                            e.target.checked ? [...prev, col] : prev.filter((c) => c !== col)
+                          );
+                        }
+                      }}
+                    />
+                    {col}
+                  </label>
+                ))}
+              </div>
 
-          {/* Batch Size */}
-          <div>
-            <label className="block text-sm mb-1">Batch Size:</label>
-            <input
-              type="number"
-              min={1}
-              value={batchSize}
-              onChange={(e) => setBatchSize(parseInt(e.target.value))}
-              className="bg-gray-700 px-3 py-2 rounded w-full"
-            />
-          </div>
+
+
+              {/* Column Match Message */}
+              {!useTrainingAsTesting && (
+                <div className="mt-4">
+                  {columnTrainingNames.length > 0 && columnTestingNames.length > 0 && (
+                    <div
+                      className={`text-sm font-medium px-3 py-2 rounded ${columnsMatch ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+                    >
+                      {columnsMatch
+                        ? "✅ Column names match between training and testing data."
+                        : "❌ Column names do not match!"}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button
+                className="mt-4 bg-blue-600 text-white px-3 py-1 rounded"
+                disabled={selectedTargets.length === 0}
+                onClick={async () => {
+                  if (uploadedFile) {
+                    await handleGetTrainingTargetVectors(
+                      uploadedFile,
+                      selectedTargets.join(","),
+                      problemType
+                    );
+
+                    // ✅ Set feature vector names excluding selected targets
+                    setfeatureVectorNames([
+                      ...columnTrainingNames.filter((col) => !selectedTargets.includes(col))
+                    ]);
+                    
+                  }
+                }}
+              >
+                Confirm Target Column(s)
+              </button>
+
+
+            </div>
+          )}
+
         </section>
 
 
@@ -268,12 +381,16 @@ const Home: NextPage = () => {
 
         <section className="flex-1 bg-gray-700 p-6 border-r border-gray-600 overflow-auto">
           <h2 className="text-xl font-medium mb-2">Neural Network Builder</h2>
-          {columnNames.length > 0 ? (
-            <NeuralNetworkBuilder columnNames={columnNames} />
+          {featureVectorNames.length > 0 ? (
+            <NeuralNetworkBuilder
+              columnNames={featureVectorNames}
+              numOutputNeurons={numOutputNeurons ?? 2} // fallback to 2 if not loaded
+            />
           ) : (
             <p className="text-gray-300">Upload training data to start building the network.</p>
           )}
         </section>
+
 
         <section className="flex-1 bg-gray-600 p-6">
           <h2 className="text-xl font-medium mb-2">Panel 3</h2>
