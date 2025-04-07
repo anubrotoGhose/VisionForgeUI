@@ -8,7 +8,7 @@ const Home: NextPage = () => {
   const [epoch, setEpoch] = useState<number>(100);
   const [currentStage, setCurrentStage] = useState<number>(0);
   const [learningRate, setLearningRate] = useState<number>(0.03);
-  const [activation, setActivation] = useState<string>("Tanh");
+  const [optimizer, setOptimzer] = useState<string>("Tanh");
   const [regularisation, setRegularisation] = useState<string>("None");
   const [regularisationRate, setRegularisationRate] = useState<number>(0);
   const [problemType, setProblemType] = useState<string>("Classification-Single");
@@ -227,19 +227,22 @@ const Home: NextPage = () => {
             />
           </div>
 
-          {/* Activation Function */}
+          {/* Optimzer Function */}
           <div>
-            <label className="block text-sm">Activation:</label>
+            <label className="block text-sm">Optimizer:</label>
             <select
-              value={activation}
-              onChange={(e) => setActivation(e.target.value)}
+              value={optimizer}
+              onChange={(e) => setOptimzer(e.target.value)}
               className="bg-gray-700 px-3 py-1 rounded"
             >
-              <option>ReLU</option>
-              <option>Tanh</option>
-              <option>Sigmoid</option>
-              <option>Linear</option>
-              <option>Custom</option>
+              <option>SGD</option>
+              <option>Adam</option>
+              <option>AdamW</option>
+              <option>RMSprop</option>
+              <option>Adagrad</option>
+              <option>Adadelta</option>
+              <option>ASGD</option>
+              <option>LBFGS</option>
             </select>
           </div>
 
@@ -325,6 +328,23 @@ const Home: NextPage = () => {
             <label className="text-sm">Use training data as testing data</label>
           </div>
 
+          {useTrainingAsTesting && (
+            <div className="mb-4">
+              <label className="text-sm block mb-1">
+                Train/Test Ratio: {(trainTestRatio * 100).toFixed(0)}% Train / {(100 - trainTestRatio * 100).toFixed(0)}% Test
+              </label>
+              <input
+                type="range"
+                min={0.5}
+                max={0.95}
+                step={0.01}
+                value={trainTestRatio}
+                onChange={(e) => setTrainTestRatio(parseFloat(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          )}
+
           {/* 🆕 Target Column Selector */}
           {uploadedFile && columnTrainingNames.length > 0 && (
             <div className="mt-4">
@@ -397,6 +417,16 @@ const Home: NextPage = () => {
             </div>
           )}
 
+          <div className="mb-4">
+            <label className="text-sm block mb-1">Batch Size</label>
+            <input
+              type="number"
+              min={1}
+              value={batchSize}
+              onChange={(e) => setBatchSize(Number(e.target.value))}
+              className="border rounded px-2 py-1 w-full"
+            />
+          </div>
         </section>
 
 
@@ -409,9 +439,18 @@ const Home: NextPage = () => {
           <h2 className="text-xl font-medium mb-2">Neural Network Builder</h2>
           {featureVectorNames.length > 0 ? (
             <NeuralNetworkBuilder
-              columnNames={featureVectorNames}
+              featureColumnNames={featureVectorNames}
+              targetColumns={columnTrainingNames.filter(name => !featureVectorNames.includes(name))}
               numOutputNeurons={numOutputNeurons ?? 2}
+              epoch={epoch}
+              learningRate={learningRate}
+              optimizer={optimizer}
+              regularisation={regularisation}
+              regularisationRate={regularisationRate}
+              useTrainingAsTesting={useTrainingAsTesting}
+              trainTestRatio={trainTestRatio}
               problemType={problemType} // fallback to 2 if not loaded
+              
             />
           ) : (
             <p className="text-gray-300">Upload training data to start building the network.</p>

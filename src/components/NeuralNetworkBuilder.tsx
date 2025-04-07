@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useRef, useEffect, JSX } from "react";
-import { serializeNetwork } from "@/app/utils/networkUtils";
+import React, { useState, useRef, useEffect, JSX, useCallback } from "react";
+// import { serializeNetwork } from "@/app/utils/networkUtils";
 
 const ACTIVATION_FUNCTIONS = ["ReLU", "Tanh", "Sigmoid", "Linear", "Custom"];
 
@@ -13,28 +13,45 @@ type Layer = {
 
 
 const NeuralNetworkBuilder = ({
-    columnNames,
+    featureColumnNames,
+    targetColumns,
     numOutputNeurons,
+    epoch,
+    learningRate,
+    optimizer,
+    regularisation,
+    regularisationRate,
+    useTrainingAsTesting,
+    trainTestRatio,
     problemType,
+
 }: {
-    columnNames: string[];
+    featureColumnNames: string[];
+    targetColumns: string[],
     numOutputNeurons: number;
-    problemType: string,
+    epoch: number;
+    learningRate: number;
+    optimizer: string;
+    regularisation: string;
+    regularisationRate: number;
+    useTrainingAsTesting: boolean;
+    trainTestRatio: number;
+    problemType: string;
 }) => {
     const [features, setFeatures] = useState(
-        columnNames.map((name) => ({
+        featureColumnNames.map((name) => ({
             name: name.slice(0, 10),
             selected: true,
         }))
     );
 
     useEffect(() => {
-        const freshFeatures = columnNames.map((name) => ({
+        const freshFeatures = featureColumnNames.map((name) => ({
             name: name.slice(0, 10),
             selected: true,
         }));
         setFeatures(freshFeatures);
-    }, [columnNames]);
+    }, [featureColumnNames]);
 
     const [hiddenLayers, setHiddenLayers] = useState<Layer[]>([
         { id: 1, neurons: 4, activation: "Tanh" },
@@ -100,7 +117,7 @@ const NeuralNetworkBuilder = ({
         );
     };
 
-    const updateConnections = () => {
+    const updateConnections = useCallback(() => {
         const connections: JSX.Element[] = [];
 
         const allLayers = [
@@ -151,13 +168,15 @@ const NeuralNetworkBuilder = ({
         }
 
         setSvgLines(connections);
-    };
+    }, [features, hiddenLayers, numOutputNeurons, neuronRefs]);
+
+
 
     useEffect(() => {
         updateConnections();
         window.addEventListener("resize", updateConnections);
         return () => window.removeEventListener("resize", updateConnections);
-    }, [features, hiddenLayers]);
+    }, [features, hiddenLayers, updateConnections]);
 
     const handleBuildModel = async () => {
         const inputFeatures = features.filter((f) => f.selected).map((f) => f.name);
@@ -186,6 +205,48 @@ const NeuralNetworkBuilder = ({
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify(modelConfig),
+            });
+
+            if (!res.ok) throw new Error(`Status ${res.status}`);
+            const result = await res.json();
+            console.log("Training Result:", result);
+            alert("Model sent to backend!");
+        } catch (error) {
+            console.error("Error sending to backend:", error);
+            alert("Error sending model!");
+        }
+    };
+
+    const handleTrainModel = async () => {
+
+        const problemTypeMapping: Record<string, number> = {
+            "Regression": 1,
+            "Classification-Single": 2,
+            "Classification-Multilabel": 3,
+        };
+
+        const trainConfig = {
+            featureColumnNames: featureColumnNames,
+            targetColumns: targetColumns,
+            output_size: numOutputNeurons,
+            task_type: problemTypeMapping[problemType], // e.g., { "Regression": 1, "Classification-Single": 2, "Classification-Multilabel": 3 }
+            epoch: epoch,
+            learning_rate: learningRate,
+            optimizer: optimizer,
+            regularisation: regularisation,
+            regularisation_rate: regularisationRate,
+            use_training_as_testing: useTrainingAsTesting,
+            train_test_ratio: trainTestRatio,
+        };
+        
+
+        try {
+            const res = await fetch("http://localhost:8000/trainmodel", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(trainConfig),
             });
 
             if (!res.ok) throw new Error(`Status ${res.status}`);
@@ -284,6 +345,11 @@ const NeuralNetworkBuilder = ({
             <div className="mt-4 flex justify-center">
                 <button onClick={handleBuildModel} className="bg-indigo-500 px-4 py-2 rounded text-white">
                     Build Model
+                </button>
+            </div>
+            <div className="mt-4 flex justify-center">
+                <button onClick={handleTrainModel} className="bg-indigo-500 px-4 py-2 rounded text-white">
+                    Train Model
                 </button>
             </div>
         </section>
