@@ -8,7 +8,7 @@ const Home: NextPage = () => {
   const [epoch, setEpoch] = useState<number>(100);
   const [currentStage, setCurrentStage] = useState<number>(0);
   const [learningRate, setLearningRate] = useState<number>(0.03);
-  const [optimizer, setOptimzer] = useState<string>("Tanh");
+  const [optimizer, setOptimzer] = useState<string>("SGD");
   const [regularisation, setRegularisation] = useState<string>("None");
   const [regularisationRate, setRegularisationRate] = useState<number>(0);
   const [problemType, setProblemType] = useState<string>("Classification-Single");
@@ -21,6 +21,11 @@ const Home: NextPage = () => {
   const [useTrainingAsTesting, setUseTrainingAsTesting] = useState(true);
   const [trainTestRatio, setTrainTestRatio] = useState(0.8);
   const [batchSize, setBatchSize] = useState(10);
+
+  // store content
+  const [trainingData, setTrainingData] = useState<Array<Record<string, any>>>([]);
+  const [testingData, setTestingData] = useState<Array<Record<string, any>>>([]);
+
 
   // for maintaining list of features
   const [columnTrainingNames, setcolumnTrainingNames] = useState<string[]>([]);
@@ -109,17 +114,22 @@ const Home: NextPage = () => {
     if (file) {
       const formData = new FormData();
       formData.append("file", file);
-
+  
       try {
         const response = await fetch("http://localhost:8000/upload-training-data", {
           method: "POST",
           body: formData,
         });
-
+  
         if (response.ok) {
           const result = await response.json();
           setcolumnTrainingNames(result.column_names);
-          setUploadedFile(file); // save file for later
+  
+          // Save content if needed
+          setTrainingData(result.content);
+          
+  
+          setUploadedFile(file);
         } else {
           console.error("Upload failed:", response.statusText);
         }
@@ -128,8 +138,9 @@ const Home: NextPage = () => {
       }
     }
   };
+  
 
-
+  console.log("Training data:", trainingData);
 
   const handleTestingDataUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -149,6 +160,9 @@ const Home: NextPage = () => {
 
           console.log("Column Names:", result.column_names);
           setcolumnTestingNames(result.column_names);
+
+          setTestingData(result.content);
+          console.log("Training data:", testingData);
 
         } else {
           console.error("Upload failed:", response.statusText);
@@ -450,7 +464,9 @@ const Home: NextPage = () => {
               useTrainingAsTesting={useTrainingAsTesting}
               trainTestRatio={trainTestRatio}
               problemType={problemType} // fallback to 2 if not loaded
-              
+              trainingData={trainingData}
+              testingData={testingData}
+
             />
           ) : (
             <p className="text-gray-300">Upload training data to start building the network.</p>

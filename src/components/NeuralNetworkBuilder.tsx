@@ -11,6 +11,8 @@ type Layer = {
     activation: string;
 };
 
+type DataRow = Record<string, any>; 
+
 
 const NeuralNetworkBuilder = ({
     featureColumnNames,
@@ -24,6 +26,8 @@ const NeuralNetworkBuilder = ({
     useTrainingAsTesting,
     trainTestRatio,
     problemType,
+    trainingData,
+    testingData
 
 }: {
     featureColumnNames: string[];
@@ -37,6 +41,8 @@ const NeuralNetworkBuilder = ({
     useTrainingAsTesting: boolean;
     trainTestRatio: number;
     problemType: string;
+    trainingData: DataRow[];
+    testingData: DataRow[];
 }) => {
     const [features, setFeatures] = useState(
         featureColumnNames.map((name) => ({
@@ -178,11 +184,18 @@ const NeuralNetworkBuilder = ({
         return () => window.removeEventListener("resize", updateConnections);
     }, [features, hiddenLayers, updateConnections]);
 
-    const handleBuildModel = async () => {
+
+    useEffect(() => {
+        console.log("Training data inside NeuralNetworkBuilder updated:", trainingData);
+      }, [trainingData]);
+
+    const handleBuildAndTrainModel = async () => {
         const inputFeatures = features.filter((f) => f.selected).map((f) => f.name);
         const activationIndices = hiddenLayers.map((layer) =>
             ACTIVATION_FUNCTIONS.indexOf(layer.activation)
         );
+
+        
 
         const problemTypeMapping: Record<string, number> = {
             "Regression": 1,
@@ -198,56 +211,41 @@ const NeuralNetworkBuilder = ({
             task_type: problemTypeMapping[problemType],
         };
 
-        try {
-            const res = await fetch("http://localhost:8000/createmodel", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(modelConfig),
-            });
-
-            if (!res.ok) throw new Error(`Status ${res.status}`);
-            const result = await res.json();
-            console.log("Training Result:", result);
-            alert("Model sent to backend!");
-        } catch (error) {
-            console.error("Error sending to backend:", error);
-            alert("Error sending model!");
-        }
-    };
-
-    const handleTrainModel = async () => {
-
-        const problemTypeMapping: Record<string, number> = {
-            "Regression": 1,
-            "Classification-Single": 2,
-            "Classification-Multilabel": 3,
-        };
-
         const trainConfig = {
             featureColumnNames: featureColumnNames,
             targetColumns: targetColumns,
             output_size: numOutputNeurons,
-            task_type: problemTypeMapping[problemType], // e.g., { "Regression": 1, "Classification-Single": 2, "Classification-Multilabel": 3 }
+            task_type: problemTypeMapping[problemType],
             epoch: epoch,
             learning_rate: learningRate,
             optimizer: optimizer,
             regularisation: regularisation,
             regularisation_rate: regularisationRate,
             use_training_as_testing: useTrainingAsTesting,
-            train_test_ratio: trainTestRatio,
+            train_test_ratio: trainTestRatio, // ✅ snake_case
         };
-        
+
+        const dataConfig = {
+            trainingData: trainingData,
+            testingData: testingData
+        }
+
+        const combinedConfig = {
+            model_cfg: modelConfig,
+            train_cfg: trainConfig,
+            data_cfg: dataConfig
+        };
 
         try {
-            const res = await fetch("http://localhost:8000/trainmodel", {
+            const res = await fetch("http://localhost:8000/createandtrainmodel", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify(trainConfig),
+                body: JSON.stringify(combinedConfig),
             });
+
+            console.log("Sending payload:", JSON.stringify(combinedConfig, null, 2));
 
             if (!res.ok) throw new Error(`Status ${res.status}`);
             const result = await res.json();
@@ -343,13 +341,8 @@ const NeuralNetworkBuilder = ({
             </div>
 
             <div className="mt-4 flex justify-center">
-                <button onClick={handleBuildModel} className="bg-indigo-500 px-4 py-2 rounded text-white">
-                    Build Model
-                </button>
-            </div>
-            <div className="mt-4 flex justify-center">
-                <button onClick={handleTrainModel} className="bg-indigo-500 px-4 py-2 rounded text-white">
-                    Train Model
+                <button onClick={handleBuildAndTrainModel} className="bg-indigo-500 px-4 py-2 rounded text-white">
+                    Build And Train Model
                 </button>
             </div>
         </section>
