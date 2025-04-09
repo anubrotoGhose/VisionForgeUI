@@ -41,6 +41,8 @@ const Home: NextPage = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
 
+  const [trainingResult, setTrainingResult] = useState<any>(null);
+
 
   const handlePlay = () => {
     if (isPlaying) {
@@ -463,6 +465,7 @@ const Home: NextPage = () => {
               regularisationRate={regularisationRate}
               useTrainingAsTesting={useTrainingAsTesting}
               trainTestRatio={trainTestRatio}
+              batchSize={batchSize}
               problemType={problemType} // fallback to 2 if not loaded
               trainingData={trainingData}
               testingData={testingData}

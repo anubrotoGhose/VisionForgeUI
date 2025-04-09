@@ -25,6 +25,7 @@ const NeuralNetworkBuilder = ({
     regularisationRate,
     useTrainingAsTesting,
     trainTestRatio,
+    batchSize,
     problemType,
     trainingData,
     testingData
@@ -40,6 +41,7 @@ const NeuralNetworkBuilder = ({
     regularisationRate: number;
     useTrainingAsTesting: boolean;
     trainTestRatio: number;
+    batchSize: number;
     problemType: string;
     trainingData: DataRow[];
     testingData: DataRow[];
@@ -223,6 +225,7 @@ const NeuralNetworkBuilder = ({
             regularisation_rate: regularisationRate,
             use_training_as_testing: useTrainingAsTesting,
             train_test_ratio: trainTestRatio, // ✅ snake_case
+            batch_size: batchSize
         };
 
         const dataConfig = {
