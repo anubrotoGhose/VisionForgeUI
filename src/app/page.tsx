@@ -3,6 +3,18 @@ import { useState, useRef } from "react";
 import { FaRedoAlt, FaPlay, FaPause, FaForward } from "react-icons/fa";
 import type { NextPage } from "next";
 import NeuralNetworkBuilder from "@/components/NeuralNetworkBuilder";
+import { saveAs } from 'file-saver';
+
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts';
 
 const Home: NextPage = () => {
   const [epoch, setEpoch] = useState<number>(100);
@@ -14,8 +26,8 @@ const Home: NextPage = () => {
   const [problemType, setProblemType] = useState<string>("Classification-Single");
 
   // play pause button state
-  const [isPlaying, setIsPlaying] = useState(false);
-  const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
+  // const [isPlaying, setIsPlaying] = useState(false);
+  // const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
 
   // left panel
   const [useTrainingAsTesting, setUseTrainingAsTesting] = useState(true);
@@ -41,41 +53,41 @@ const Home: NextPage = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
 
-  const [trainingResult, setTrainingResult] = useState<any>(null);
+  const [modelResults, setModelResults] = useState<any>(null);
 
 
-  const handlePlay = () => {
-    if (isPlaying) {
-      // Pause the loop
-      timeoutRefs.current.forEach(clearTimeout);
-      timeoutRefs.current = [];
-      setIsPlaying(false);
-      return;
-    }
+  // const handlePlay = () => {
+  //   if (isPlaying) {
+  //     // Pause the loop
+  //     timeoutRefs.current.forEach(clearTimeout);
+  //     timeoutRefs.current = [];
+  //     setIsPlaying(false);
+  //     return;
+  //   }
 
-    // Play from current stage to epoch
-    setIsPlaying(true);
+  //   // Play from current stage to epoch
+  //   setIsPlaying(true);
 
-    for (let i = currentStage + 1; i <= epoch; i++) {
-      const timeout = setTimeout(() => {
-        setCurrentStage(i);
+  //   for (let i = currentStage + 1; i <= epoch; i++) {
+  //     const timeout = setTimeout(() => {
+  //       setCurrentStage(i);
 
-        if (i === epoch) {
-          setIsPlaying(false); // Stop at the end
-        }
-      }, (i - currentStage) * 50);
+  //       if (i === epoch) {
+  //         setIsPlaying(false); // Stop at the end
+  //       }
+  //     }, (i - currentStage) * 50);
 
-      timeoutRefs.current.push(timeout);
-    }
-  };
+  //     timeoutRefs.current.push(timeout);
+  //   }
+  // };
 
 
-  const handleReset = () => {
-    timeoutRefs.current.forEach(clearTimeout); // stop any running loop
-    timeoutRefs.current = [];
-    setCurrentStage(0);
-    setIsPlaying(false);
-  };
+  // const handleReset = () => {
+  //   timeoutRefs.current.forEach(clearTimeout); // stop any running loop
+  //   timeoutRefs.current = [];
+  //   setCurrentStage(0);
+  //   setIsPlaying(false);
+  // };
 
 
   const handleSkip = () => {
@@ -116,21 +128,21 @@ const Home: NextPage = () => {
     if (file) {
       const formData = new FormData();
       formData.append("file", file);
-  
+
       try {
         const response = await fetch("http://localhost:8000/upload-training-data", {
           method: "POST",
           body: formData,
         });
-  
+
         if (response.ok) {
           const result = await response.json();
           setcolumnTrainingNames(result.column_names);
-  
+
           // Save content if needed
           setTrainingData(result.content);
-          
-  
+
+
           setUploadedFile(file);
         } else {
           console.error("Upload failed:", response.statusText);
@@ -140,7 +152,7 @@ const Home: NextPage = () => {
       }
     }
   };
-  
+
 
   console.log("Training data:", trainingData);
 
@@ -182,6 +194,47 @@ const Home: NextPage = () => {
     columnTrainingNames.length === columnTestingNames.length &&
     columnTrainingNames.every((name, idx) => name === columnTestingNames[idx]);
 
+  const handleModelTrained = (results: any) => {
+    setModelResults(results);
+    // Optionally scroll to results or show a notification
+  };
+
+  const handleDownloadModel = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/modeldownload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(modelResults.model_structure), // pass model_structure
+      });
+
+      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+
+      const blob = await response.blob();
+      saveAs(blob, "complete_model.pth");
+    } catch (error) {
+      console.error("Error downloading model:", error);
+      alert("Error downloading model. See console for details.");
+    }
+  };
+
+  const handleDownloadWeights = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/modelweight", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(modelResults.model_structure), // pass model_structure
+      });
+
+      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+
+      const blob = await response.blob();
+      saveAs(blob, "model_weights.pth");
+    } catch (error) {
+      console.error("Error downloading weights:", error);
+      alert("Error downloading weights. See console for details.");
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col dark bg-gray-900 text-white">
       <div className="bg-gray-900 text-white px-6 py-2 text-lg font-semibold shadow-md">
@@ -192,7 +245,7 @@ const Home: NextPage = () => {
 
         <div className="flex flex-wrap items-center gap-4">
           {/* Control Buttons */}
-          <div className="flex gap-2">
+          {/* <div className="flex gap-2">
             <button
               onClick={handlePlay}
               className={`${isPlaying ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"
@@ -215,7 +268,7 @@ const Home: NextPage = () => {
               <FaForward />
               Skip
             </button>
-          </div>
+          </div> */}
 
           {/* Epoch Input and Stage Display */}
           <div>
@@ -227,9 +280,9 @@ const Home: NextPage = () => {
               className="bg-gray-700 px-3 py-1 rounded w-20"
             />
           </div>
-          <div className="text-sm">
+          {/* <div className="text-sm">
             Stage: <span className="font-bold">{currentStage}</span> / {epoch}
-          </div>
+          </div> */}
 
           {/* Learning Rate */}
           <div>
@@ -469,7 +522,7 @@ const Home: NextPage = () => {
               problemType={problemType} // fallback to 2 if not loaded
               trainingData={trainingData}
               testingData={testingData}
-
+              onModelTrained={handleModelTrained}
             />
           ) : (
             <p className="text-gray-300">Upload training data to start building the network.</p>
@@ -478,8 +531,64 @@ const Home: NextPage = () => {
 
 
         <section className="flex-1 bg-gray-600 p-6">
-          <h2 className="text-xl font-medium mb-2">Panel 3</h2>
-          <p>Content for the third panel.</p>
+          <h2 className="text-xl font-medium mb-2">Output</h2>
+          {modelResults && modelResults.loss_over_epochs && (
+            <div className="mt-4">
+              <h4 className="text-md font-medium text-gray-200">Loss Over Epochs</h4>
+              <div className="h-60 mt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={modelResults.loss_over_epochs.map((loss: number, index: number) => ({
+                      epoch: index + 1,
+                      loss,
+                    }))}
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="epoch" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="loss"
+                      stroke="#8884d8"
+                      activeDot={{ r: 8 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              {/* Test Loss */}
+              {modelResults.test_loss && (
+                <p className="mt-2 text-gray-300">
+                  📉 <span className="font-medium">Test Loss:</span> {modelResults.test_loss}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Download buttons */}
+          <div className="mt-6 flex space-x-4">
+            <button
+              onClick={handleDownloadModel}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded flex items-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download PyTorch Model
+            </button>
+
+            <button
+              onClick={handleDownloadWeights}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded flex items-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download Model Weights
+            </button>
+          </div>
         </section>
       </main>
     </div>

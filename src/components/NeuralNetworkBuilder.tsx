@@ -28,7 +28,8 @@ const NeuralNetworkBuilder = ({
     batchSize,
     problemType,
     trainingData,
-    testingData
+    testingData,
+    onModelTrained
 
 }: {
     featureColumnNames: string[];
@@ -45,6 +46,7 @@ const NeuralNetworkBuilder = ({
     problemType: string;
     trainingData: DataRow[];
     testingData: DataRow[];
+    onModelTrained?: (results: any) => void;
 }) => {
     const [features, setFeatures] = useState(
         featureColumnNames.map((name) => ({
@@ -254,6 +256,10 @@ const NeuralNetworkBuilder = ({
             const result = await res.json();
             console.log("Training Result:", result);
             alert("Model sent to backend!");
+
+            if (onModelTrained) {
+                onModelTrained(result);
+              }
         } catch (error) {
             console.error("Error sending to backend:", error);
             alert("Error sending model!");
